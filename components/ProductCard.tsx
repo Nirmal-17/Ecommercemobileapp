@@ -1,4 +1,5 @@
 import React from 'react';
+
 import {
   View,
   Text,
@@ -17,11 +18,15 @@ type Product = {
 type ProductCardProps = {
   product: Product;
   onPress: () => void;
+  isWishlisted: boolean;
+  onWishlistPress: () => void;
 };
 
 function ProductCard({
   product,
   onPress,
+  isWishlisted,
+  onWishlistPress,
 }: ProductCardProps) {
   return (
     <Pressable
@@ -29,19 +34,44 @@ function ProductCard({
         styles.card,
         pressed && styles.pressed,
       ]}
-      onPress={onPress}>
+      onPress={onPress}
+    >
 
-      <Image
-        source={{uri: product.image}}
-        style={styles.image}
-        resizeMode="cover"
-      />
+      {/* PRODUCT IMAGE */}
+
+      <View style={styles.imageContainer}>
+
+        <Image
+          source={{uri: product.image}}
+          style={styles.image}
+          resizeMode="cover"
+        />
+
+        {/* WISHLIST HEART */}
+
+        <Pressable
+          style={styles.heartButton}
+          onPress={onWishlistPress}
+          hitSlop={10}
+        >
+
+          <Text style={styles.heart}>
+            {isWishlisted ? '♥' : '♡'}
+          </Text>
+
+        </Pressable>
+
+      </View>
+
+
+      {/* PRODUCT INFORMATION */}
 
       <View style={styles.info}>
 
         <Text
           style={styles.name}
-          numberOfLines={2}>
+          numberOfLines={2}
+        >
           {product.name}
         </Text>
 
@@ -55,13 +85,14 @@ function ProductCard({
   );
 }
 
+
 const styles = StyleSheet.create({
+
   card: {
     backgroundColor: 'white',
     borderRadius: 12,
     marginBottom: 15,
     overflow: 'hidden',
-
     elevation: 3,
 
     shadowOffset: {
@@ -73,29 +104,73 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
 
+
   pressed: {
     opacity: 0.7,
   },
+
+
+  imageContainer: {
+    position: 'relative',
+  },
+
 
   image: {
     width: '100%',
     height: 180,
   },
 
+
+  heartButton: {
+    position: 'absolute',
+
+    top: 10,
+    right: 10,
+
+    width: 42,
+    height: 42,
+
+    borderRadius: 21,
+
+    backgroundColor: 'white',
+
+    justifyContent: 'center',
+    alignItems: 'center',
+
+    elevation: 4,
+  },
+
+
+  heart: {
+    fontSize: 27,
+
+    color: '#ff3b30',
+
+    lineHeight: 30,
+  },
+
+
   info: {
     padding: 15,
   },
 
+
   name: {
     fontSize: 18,
+
     fontWeight: '600',
   },
 
+
   price: {
     fontSize: 20,
+
     fontWeight: 'bold',
+
     marginTop: 8,
   },
+
 });
+
 
 export default ProductCard;

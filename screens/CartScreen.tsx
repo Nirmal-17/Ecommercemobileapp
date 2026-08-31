@@ -3,272 +3,752 @@ import React from 'react';
 import {
   View,
   Text,
-  FlatList,
   Image,
   Pressable,
   StyleSheet,
+  FlatList,
 } from 'react-native';
 
+
 function CartScreen({
+  navigation,
   cartItems,
   increaseQuantity,
   decreaseQuantity,
   removeFromCart,
 }: any) {
-  const totalPrice = cartItems.reduce(
+
+
+  // =================================
+  // TOTAL CALCULATION
+  // =================================
+
+  const subtotal = cartItems.reduce(
     (total: number, item: any) =>
       total +
-      Number(item.price) * item.quantity,
+      item.price * item.quantity,
     0,
   );
 
-  if (cartItems.length === 0) {
-    return (
-      <View style={styles.emptyContainer}>
 
-        <Text style={styles.emptyIcon}>
+  const deliveryFee =
+    cartItems.length > 0
+      ? 5
+      : 0;
+
+
+  const total =
+    subtotal + deliveryFee;
+
+
+  // =================================
+  // EMPTY CART
+  // =================================
+
+  if (cartItems.length === 0) {
+
+    return (
+
+      <View
+        style={styles.emptyContainer}
+      >
+
+        <Text
+          style={styles.emptyIcon}
+        >
           🛒
         </Text>
 
-        <Text style={styles.emptyTitle}>
+
+        <Text
+          style={styles.emptyTitle}
+        >
           Your Cart is Empty
         </Text>
 
-        <Text style={styles.emptyText}>
-          Add some products to your cart.
+
+        <Text
+          style={styles.emptyText}
+        >
+          Add some products to your cart
+          to see them here.
         </Text>
 
+
+        <Pressable
+          style={styles.shopButton}
+
+          onPress={() =>
+            navigation.navigate(
+              'Home',
+            )
+          }
+        >
+
+          <Text
+            style={styles.shopButtonText}
+          >
+            Start Shopping
+          </Text>
+
+        </Pressable>
+
       </View>
+
     );
   }
 
-  return (
-    <View style={styles.container}>
 
-      <FlatList
-        data={cartItems}
-        keyExtractor={item => item.id}
-        showsVerticalScrollIndicator={false}
-        renderItem={({item}) => (
-          <View style={styles.cartItem}>
+  // =================================
+  // CART ITEM
+  // =================================
 
-            <Image
-              source={{uri: item.image}}
-              style={styles.image}
-            />
+  const renderCartItem = ({
+    item,
+  }: any) => (
 
-            <View style={styles.details}>
+    <View
+      style={styles.cartItem}
+    >
 
-              <Text style={styles.name}>
-                {item.name}
-              </Text>
+      <Image
+        source={{
+          uri: item.image,
+        }}
 
-              <Text style={styles.price}>
-                {'$' + item.price}
-              </Text>
-
-              <View style={styles.quantityRow}>
-
-                <Pressable
-                  style={styles.quantityButton}
-                  onPress={() =>
-                    decreaseQuantity(item.id)
-                  }
-                >
-                  <Text style={styles.quantityText}>
-                    −
-                  </Text>
-                </Pressable>
-
-                <Text style={styles.quantity}>
-                  {item.quantity}
-                </Text>
-
-                <Pressable
-                  style={styles.quantityButton}
-                  onPress={() =>
-                    increaseQuantity(item.id)
-                  }
-                >
-                  <Text style={styles.quantityText}>
-                    +
-                  </Text>
-                </Pressable>
-
-              </View>
-
-              <Pressable
-                onPress={() =>
-                  removeFromCart(item.id)
-                }
-              >
-                <Text style={styles.removeText}>
-                  Remove
-                </Text>
-              </Pressable>
-
-            </View>
-
-          </View>
-        )}
+        style={styles.productImage}
       />
 
-      <View style={styles.bottomSection}>
 
-        <View style={styles.totalRow}>
+      <View
+        style={styles.itemDetails}
+      >
 
-          <Text style={styles.totalLabel}>
-            Total
+        <Text
+          style={styles.productName}
+          numberOfLines={2}
+        >
+          {item.name}
+        </Text>
+
+
+        <Text
+          style={styles.productPrice}
+        >
+          ${item.price.toFixed(2)}
+        </Text>
+
+
+        {/* QUANTITY */}
+
+        <View
+          style={styles.quantityRow}
+        >
+
+          <Pressable
+            style={styles.quantityButton}
+
+            onPress={() =>
+              decreaseQuantity(
+                item.id,
+              )
+            }
+          >
+
+            <Text
+              style={styles.quantityText}
+            >
+              −
+            </Text>
+
+          </Pressable>
+
+
+          <Text
+            style={styles.quantity}
+          >
+            {item.quantity}
           </Text>
 
-          <Text style={styles.totalPrice}>
-            {'$' + totalPrice.toFixed(2)}
-          </Text>
+
+          <Pressable
+            style={styles.quantityButton}
+
+            onPress={() =>
+              increaseQuantity(
+                item.id,
+              )
+            }
+          >
+
+            <Text
+              style={styles.quantityText}
+            >
+              +
+            </Text>
+
+          </Pressable>
 
         </View>
 
-        <Pressable style={styles.checkoutButton}>
-          <Text style={styles.checkoutText}>
-            Checkout
+      </View>
+
+
+      {/* RIGHT SIDE */}
+
+      <View
+        style={styles.rightSection}
+      >
+
+        <Text
+          style={styles.itemTotal}
+        >
+          $
+          {(
+            item.price *
+            item.quantity
+          ).toFixed(2)}
+        </Text>
+
+
+        <Pressable
+          onPress={() =>
+            removeFromCart(
+              item.id,
+            )
+          }
+        >
+
+          <Text
+            style={styles.removeText}
+          >
+            Remove
           </Text>
+
         </Pressable>
 
       </View>
 
     </View>
+
+  );
+
+
+  // =================================
+  // MAIN CART
+  // =================================
+
+  return (
+
+    <View
+      style={styles.container}
+    >
+
+      <FlatList
+
+        data={cartItems}
+
+        keyExtractor={
+          item => item.id
+        }
+
+        renderItem={
+          renderCartItem
+        }
+
+        showsVerticalScrollIndicator={
+          false
+        }
+
+        contentContainerStyle={
+          styles.listContent
+        }
+
+        ListHeaderComponent={
+
+          <Text
+            style={styles.title}
+          >
+            Shopping Cart
+          </Text>
+
+        }
+
+        ListFooterComponent={
+
+          <View>
+
+            {/* SUMMARY */}
+
+            <View
+              style={styles.summaryCard}
+            >
+
+              <Text
+                style={styles.summaryTitle}
+              >
+                Order Summary
+              </Text>
+
+
+              {/* SUBTOTAL */}
+
+              <View
+                style={styles.summaryRow}
+              >
+
+                <Text
+                  style={styles.summaryLabel}
+                >
+                  Subtotal
+                </Text>
+
+                <Text
+                  style={styles.summaryValue}
+                >
+                  $
+                  {subtotal.toFixed(2)}
+                </Text>
+
+              </View>
+
+
+              {/* DELIVERY */}
+
+              <View
+                style={styles.summaryRow}
+              >
+
+                <Text
+                  style={styles.summaryLabel}
+                >
+                  Delivery
+                </Text>
+
+                <Text
+                  style={styles.summaryValue}
+                >
+                  $
+                  {deliveryFee.toFixed(2)}
+                </Text>
+
+              </View>
+
+
+              <View
+                style={styles.divider}
+              />
+
+
+              {/* TOTAL */}
+
+              <View
+                style={styles.totalRow}
+              >
+
+                <Text
+                  style={styles.totalLabel}
+                >
+                  Total
+                </Text>
+
+                <Text
+                  style={styles.totalValue}
+                >
+                  $
+                  {total.toFixed(2)}
+                </Text>
+
+              </View>
+
+            </View>
+
+
+            {/* CHECKOUT BUTTON */}
+
+            <Pressable
+              style={({pressed}) => [
+                styles.checkoutButton,
+
+                pressed &&
+                  styles.pressed,
+              ]}
+
+              onPress={() =>
+                navigation.navigate(
+                  'Checkout',
+                  {
+                    cartItems:
+                      cartItems,
+                  },
+                )
+              }
+            >
+
+              <Text
+                style={
+                  styles.checkoutButtonText
+                }
+              >
+                Proceed to Checkout
+              </Text>
+
+            </Pressable>
+
+          </View>
+
+        }
+
+      />
+
+    </View>
+
   );
 }
 
+
 const styles = StyleSheet.create({
+
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
-    padding: 15,
+
+    backgroundColor:
+      '#f5f5f5',
   },
+
+
+  listContent: {
+    padding: 15,
+
+    paddingBottom: 30,
+  },
+
+
+  title: {
+    fontSize: 28,
+
+    fontWeight: 'bold',
+
+    marginBottom: 15,
+  },
+
 
   cartItem: {
-    flexDirection: 'row',
-    backgroundColor: 'white',
+    backgroundColor:
+      '#ffffff',
+
     borderRadius: 12,
+
     padding: 12,
+
     marginBottom: 12,
+
+    flexDirection: 'row',
+
+    elevation: 2,
+
+    minHeight: 130,
   },
 
-  image: {
-    width: 100,
-    height: 100,
+
+  productImage: {
+    width: 95,
+
+    height: 105,
+
     borderRadius: 10,
+
+    backgroundColor:
+      '#eeeeee',
   },
 
-  details: {
+
+  itemDetails: {
     flex: 1,
-    marginLeft: 15,
+
+    paddingLeft: 12,
+
+    paddingRight: 5,
+
   },
 
-  name: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 5,
-  },
 
-  price: {
-    fontSize: 17,
+  productName: {
+    fontSize: 16,
+
     fontWeight: '600',
+
+    marginBottom: 7,
+  },
+
+
+  productPrice: {
+    fontSize: 15,
+
+    fontWeight: 'bold',
+
     marginBottom: 10,
   },
+
 
   quantityRow: {
     flexDirection: 'row',
+
     alignItems: 'center',
-    marginBottom: 10,
   },
+
 
   quantityButton: {
-    width: 35,
-    height: 35,
+    width: 32,
+
+    height: 32,
+
     borderRadius: 8,
-    backgroundColor: '#007AFF',
-    justifyContent: 'center',
-    alignItems: 'center',
+
+    backgroundColor:
+      '#eeeeee',
+
+    justifyContent:
+      'center',
+
+    alignItems:
+      'center',
   },
+
 
   quantityText: {
-    color: 'white',
-    fontSize: 22,
+    fontSize: 21,
+
     fontWeight: 'bold',
   },
+
 
   quantity: {
-    fontSize: 18,
+    fontSize: 16,
+
     fontWeight: 'bold',
-    marginHorizontal: 15,
+
+    marginHorizontal: 13,
+
+    minWidth: 15,
+
+    textAlign: 'center',
   },
 
+
+  rightSection: {
+    justifyContent:
+      'space-between',
+
+    alignItems: 'flex-end',
+
+    paddingVertical: 2,
+  },
+
+
+  itemTotal: {
+    fontSize: 16,
+
+    fontWeight: 'bold',
+  },
+
+
   removeText: {
-    color: '#e53935',
-    fontSize: 15,
+    color: '#ff3b30',
+
+    fontSize: 13,
+
     fontWeight: '600',
   },
 
-  bottomSection: {
-    backgroundColor: 'white',
-    padding: 15,
-    borderRadius: 12,
-    marginTop: 10,
+
+  summaryCard: {
+    backgroundColor:
+      '#ffffff',
+
+    borderRadius: 14,
+
+    padding: 18,
+
+    marginTop: 8,
+
+    elevation: 2,
   },
+
+
+  summaryTitle: {
+    fontSize: 20,
+
+    fontWeight: 'bold',
+
+    marginBottom: 15,
+  },
+
+
+  summaryRow: {
+    flexDirection: 'row',
+
+    justifyContent:
+      'space-between',
+
+    marginBottom: 10,
+  },
+
+
+  summaryLabel: {
+    fontSize: 15,
+
+    color: '#666',
+  },
+
+
+  summaryValue: {
+    fontSize: 15,
+
+    fontWeight: '600',
+  },
+
+
+  divider: {
+    height: 1,
+
+    backgroundColor:
+      '#eeeeee',
+
+    marginVertical: 8,
+  },
+
 
   totalRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 15,
+
+    justifyContent:
+      'space-between',
+
+    alignItems: 'center',
+
+    marginTop: 5,
   },
+
 
   totalLabel: {
     fontSize: 20,
+
     fontWeight: 'bold',
   },
 
-  totalPrice: {
-    fontSize: 20,
+
+  totalValue: {
+    fontSize: 22,
+
     fontWeight: 'bold',
   },
+
 
   checkoutButton: {
-    height: 52,
-    backgroundColor: '#007AFF',
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
+    height: 55,
+
+    backgroundColor:
+      '#007AFF',
+
+    borderRadius: 11,
+
+    justifyContent:
+      'center',
+
+    alignItems:
+      'center',
+
+    marginTop: 15,
   },
 
-  checkoutText: {
-    color: 'white',
+
+  checkoutButtonText: {
+    color: '#ffffff',
+
     fontSize: 18,
+
     fontWeight: 'bold',
   },
+
+
+  pressed: {
+    opacity: 0.7,
+  },
+
 
   emptyContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
+
+    justifyContent:
+      'center',
+
+    alignItems:
+      'center',
+
+    padding: 30,
+
+    backgroundColor:
+      '#f5f5f5',
   },
 
+
   emptyIcon: {
-    fontSize: 60,
+    fontSize: 70,
+
     marginBottom: 15,
   },
 
+
   emptyTitle: {
     fontSize: 25,
+
     fontWeight: 'bold',
-    marginBottom: 8,
+
+    marginBottom: 10,
   },
 
+
   emptyText: {
-    fontSize: 16,
-    color: 'gray',
+    fontSize: 15,
+
+    color: '#777',
+
+    textAlign: 'center',
+
+    lineHeight: 22,
+
+    marginBottom: 25,
   },
+
+
+  shopButton: {
+    backgroundColor:
+      '#007AFF',
+
+    paddingHorizontal: 25,
+
+    height: 50,
+
+    borderRadius: 10,
+
+    justifyContent:
+      'center',
+
+    alignItems:
+      'center',
+  },
+
+
+  shopButtonText: {
+    color: '#ffffff',
+
+    fontSize: 16,
+
+    fontWeight: 'bold',
+  },
+
 });
+
 
 export default CartScreen;
