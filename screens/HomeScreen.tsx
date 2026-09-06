@@ -152,7 +152,7 @@ function HomeScreen({
       <View style={styles.header}>
         <View>
           <Text style={styles.greeting}>Welcome back 👋</Text>
-          <Text style={styles.title}>Explore Products</Text>
+          <Text style={styles.title}>E-Shopee</Text>
         </View>
 
         {/* CART QUICK ACCESS BUTTON */}
@@ -160,7 +160,7 @@ function HomeScreen({
           style={({pressed}) => [styles.cartButton, pressed && styles.pressed]}
           onPress={() => navigation.navigate('Cart')}
           hitSlop={8}>
-          <Ionicons name="cart-outline" size={24} color="#18181b" />
+          <Ionicons name="cart-outline" size={24} color="#ed8312" />
           {cartCount > 0 ? (
             <View style={styles.cartBadge}>
               <Text style={styles.cartBadgeText}>
@@ -176,7 +176,7 @@ function HomeScreen({
         <Ionicons
           name="search-outline"
           size={20}
-          color="#8e8e93"
+          color="#40565f"
           style={styles.searchIcon}
         />
         <TextInput
