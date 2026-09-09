@@ -196,16 +196,20 @@ function CheckoutScreen({
       setPlacingOrder(true);
       const transaction_uuid = `TXN-${Date.now()}`;
 
-      const response = await fetch(`${BACKEND_URL}/api/esewa/create-payment`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-          amount: subtotal,
-          delivery_charge: deliveryFee,
-          total_amount: total,
-          transaction_uuid,
-        }),
-      });
+      const response = await fetch(
+  `${BACKEND_URL}/api/esewa/create-payment`,
+  {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      amount: subtotal,
+      deliveryCharge: deliveryFee,
+      transactionUuid: transaction_uuid,
+    }),
+  },
+);
 
       const data = await response.json();
 
@@ -291,11 +295,15 @@ function CheckoutScreen({
         const verifyRes = await fetch(`${BACKEND_URL}/api/esewa/verify-payment`, {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({
-            encodedData,
-            transaction_uuid: esewaPaymentData?.transaction_uuid,
-            total_amount: total,
-          }),
+         body: JSON.stringify({
+  transactionUuid:
+    esewaPaymentData?.transaction_uuid,
+
+  totalAmount: total,
+
+  productCode:
+    esewaPaymentData?.product_code,
+}),
         });
 
         const verifyResult = await verifyRes.json();

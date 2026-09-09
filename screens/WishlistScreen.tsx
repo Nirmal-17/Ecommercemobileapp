@@ -1,5 +1,6 @@
-import React from 'react';
+import React, {useCallback, useEffect, useState} from 'react';
 import {
+  ActivityIndicator,
   Alert,
   FlatList,
   Image,
@@ -8,69 +9,298 @@ import {
   Text,
   View,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import type {Product} from '../App';
-import {useCart, useWishlist} from '../App';
+
+const BACKEND_URL = 'http://10.0.2.2:5000';
+const USER_ID_KEY = '@user_id';
 
 export type WishlistScreenProps = {
   navigation: any;
-  wishlist?: Product[];
-  wishlistItems?: Product[];
-  toggleWishlist?: (product: Product) => void;
-  addToCart?: (product: Product, quantity?: number) => void;
 };
 
-function WishlistScreen({
-  navigation,
-  wishlist: propWishlist,
-  wishlistItems: propWishlistItems,
-  toggleWishlist: propToggleWishlist,
-  addToCart: propAddToCart,
-}: WishlistScreenProps) {
+type WishlistResponse = {
+  success: boolean;
+  wishlist: Product[];
+  message?: string;
+};
+
+function WishlistScreen({navigation}: WishlistScreenProps) {
   const insets = useSafeAreaInsets();
 
-  // Safely consume contexts with fallback to props
-  let wishlistCtx: Partial<ReturnType<typeof useWishlist>> = {};
-  let cartCtx: Partial<ReturnType<typeof useCart>> = {};
-  try {
-    wishlistCtx = useWishlist();
-  } catch {}
-  try {
-    cartCtx = useCart();
-  } catch {}
+  const [items, setItems] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
 
-  const items: Product[] =
-    propWishlist ?? propWishlistItems ?? wishlistCtx.wishlist ?? [];
-  const toggleWishlist =
-    propToggleWishlist ?? wishlistCtx.toggleWishlist ?? (() => {});
-  const addToCart = propAddToCart ?? cartCtx.addToCart ?? (() => {});
+  // ============================================================
+  // GET USER ID
+  // ============================================================
 
-  const handleAddToCart = (product: Product) => {
-    addToCart(product, 1);
-    Alert.alert('Added to Cart', `${product.name} has been added to your cart.`);
+  const getUserId = async () => {
+    const userId = await AsyncStorage.getItem(USER_ID_KEY);
+
+    if (!userId) {
+      return null;
+    }
+
+    return Number(userId);
   };
 
-  const handleAddAllToCart = () => {
-    if (items.length === 0) return;
-    items.forEach(item => addToCart(item, 1));
-    Alert.alert(
-      'All Items Added',
-      `${items.length} ${
-        items.length === 1 ? 'item has' : 'items have'
-      } been added to your shopping cart.`,
-      [
-        {text: 'Keep Browsing', style: 'cancel'},
+  // ============================================================
+  // LOAD WISHLIST FROM POSTGRESQL
+  // ============================================================
+
+  const fetchWishlist = useCallback(async () => {
+    try {
+      setLoading(true);
+
+      const userId = await getUserId();
+
+      if (!userId) {
+        setItems([]);
+        return;
+      }
+
+      const response = await fetch(
+        `${BACKEND_URL}/api/wishlist/${userId}`,
+      );
+
+      const data: WishlistResponse = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(
+          data.message || 'Failed to load wishlist',
+        );
+      }
+
+      setItems(data.wishlist || []);
+    } catch (error) {
+      console.error('Fetch wishlist error:', error);
+
+      Alert.alert(
+        'Wishlist Error',
+        'Unable to load your wishlist. Please try again.',
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchWishlist();
+  }, [fetchWishlist]);
+
+  // ============================================================
+  // REMOVE FROM WISHLIST
+  // ============================================================
+
+  const removeFromWishlist = async (product: Product) => {
+    try {
+      const userId = await getUserId();
+
+      if (!userId) {
+        Alert.alert(
+          'Login Required',
+          'Please login to manage your wishlist.',
+        );
+        navigation.replace('Login');
+        return;
+      }
+
+      setActionLoading(true);
+
+      const response = await fetch(
+        `${BACKEND_URL}/api/wishlist/${userId}/${product.id}`,
         {
-          text: 'View Cart',
-          onPress: () => navigation.navigate('Cart'),
+          method: 'DELETE',
         },
-      ],
-    );
+      );
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(
+          data.message || 'Failed to remove item',
+        );
+      }
+
+      setItems(currentItems =>
+        currentItems.filter(item => item.id !== product.id),
+      );
+    } catch (error) {
+      console.error('Remove wishlist error:', error);
+
+      Alert.alert(
+        'Error',
+        'Unable to remove this item from your wishlist.',
+      );
+    } finally {
+      setActionLoading(false);
+    }
   };
+
+  // ============================================================
+  // ADD ONE ITEM TO CART
+  // ============================================================
+
+  const handleAddToCart = async (product: Product) => {
+    try {
+      const userId = await getUserId();
+
+      if (!userId) {
+        Alert.alert(
+          'Login Required',
+          'Please login to add products to your cart.',
+        );
+        navigation.replace('Login');
+        return;
+      }
+
+      setActionLoading(true);
+
+      const response = await fetch(`${BACKEND_URL}/api/cart`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId,
+          productId: Number(product.id),
+          quantity: 1,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(
+          data.message || 'Failed to add item to cart',
+        );
+      }
+
+      Alert.alert(
+        'Added to Cart',
+        `${product.name} has been added to your cart.`,
+      );
+    } catch (error) {
+      console.error('Add to cart error:', error);
+
+      Alert.alert(
+        'Error',
+        'Unable to add this item to your cart.',
+      );
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // ============================================================
+  // ADD ALL ITEMS TO CART
+  // ============================================================
+
+  const handleAddAllToCart = async () => {
+    if (items.length === 0) {
+      return;
+    }
+
+    try {
+      const userId = await getUserId();
+
+      if (!userId) {
+        Alert.alert(
+          'Login Required',
+          'Please login to add products to your cart.',
+        );
+        navigation.replace('Login');
+        return;
+      }
+
+      setActionLoading(true);
+
+      for (const item of items) {
+        const response = await fetch(`${BACKEND_URL}/api/cart`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            userId,
+            productId: Number(item.id),
+            quantity: 1,
+          }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+          throw new Error(
+            data.message || `Failed to add ${item.name}`,
+          );
+        }
+      }
+
+      Alert.alert(
+        'All Items Added',
+        `${items.length} ${
+          items.length === 1 ? 'item has' : 'items have'
+        } been added to your shopping cart.`,
+        [
+          {
+            text: 'Keep Browsing',
+            style: 'cancel',
+          },
+          {
+            text: 'View Cart',
+            onPress: () => navigation.navigate('Cart'),
+          },
+        ],
+      );
+    } catch (error) {
+      console.error('Add all to cart error:', error);
+
+      Alert.alert(
+        'Error',
+        'Some wishlist items could not be added to your cart.',
+      );
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // ============================================================
+  // LOADING
+  // ============================================================
+
+  if (loading) {
+    return (
+      <View
+        style={[
+          styles.container,
+          styles.loadingContainer,
+          {paddingTop: Math.max(insets.top, 12)},
+        ]}>
+        <ActivityIndicator size="large" color="#ff6b00" />
+
+        <Text style={styles.loadingText}>
+          Loading wishlist...
+        </Text>
+      </View>
+    );
+  }
+
+  // ============================================================
+  // UI
+  // ============================================================
 
   return (
-    <View style={[styles.container, {paddingTop: Math.max(insets.top, 12)}]}>
+    <View
+      style={[
+        styles.container,
+        {paddingTop: Math.max(insets.top, 12)},
+      ]}>
+
       <FlatList
         data={items}
         keyExtractor={item => item.id}
@@ -80,42 +310,62 @@ function WishlistScreen({
           items.length === 0 && styles.emptyList,
           {paddingBottom: insets.bottom + 20},
         ]}
+
         ListHeaderComponent={
           items.length > 0 ? (
             <View style={styles.header}>
               <View>
-                <Text style={styles.title}>My Wishlist</Text>
+                <Text style={styles.title}>
+                  My Wishlist
+                </Text>
+
                 <Text style={styles.subtitle}>
-                  {items.length} saved {items.length === 1 ? 'item' : 'items'}
+                  {items.length} saved{' '}
+                  {items.length === 1 ? 'item' : 'items'}
                 </Text>
               </View>
 
               <Pressable
+                disabled={actionLoading}
                 style={({pressed}) => [
                   styles.addAllButton,
                   pressed && styles.pressed,
+                  actionLoading && styles.disabled,
                 ]}
                 onPress={handleAddAllToCart}>
+
                 <Ionicons
                   name="cart-outline"
                   size={16}
                   color="#ff6b00"
                   style={styles.addAllIcon}
                 />
-                <Text style={styles.addAllText}>Add All to Cart</Text>
+
+                <Text style={styles.addAllText}>
+                  Add All to Cart
+                </Text>
               </Pressable>
             </View>
           ) : undefined
         }
+
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <View style={styles.emptyIconCircle}>
-              <Ionicons name="heart-outline" size={60} color="#ff3b30" />
+              <Ionicons
+                name="heart-outline"
+                size={60}
+                color="#ff3b30"
+              />
             </View>
-            <Text style={styles.emptyTitle}>Your Wishlist is Empty</Text>
+
+            <Text style={styles.emptyTitle}>
+              Your Wishlist is Empty
+            </Text>
+
             <Text style={styles.emptyText}>
-              Explore our store and tap the heart icon on items you'd love to
-              save for later!
+              Explore our store and tap the heart icon on items
+              you'd love to save for later!
             </Text>
 
             <Pressable
@@ -124,79 +374,123 @@ function WishlistScreen({
                 pressed && styles.pressed,
               ]}
               onPress={() => navigation.navigate('Home')}>
+
               <Ionicons
                 name="bag-handle-outline"
                 size={20}
                 color="#ffffff"
                 style={styles.buttonIcon}
               />
-              <Text style={styles.shopButtonText}>Explore Products</Text>
+
+              <Text style={styles.shopButtonText}>
+                Explore Products
+              </Text>
             </Pressable>
           </View>
         }
+
         renderItem={({item}) => {
-          const formattedPrice = Number(item.price || 0).toLocaleString(
-            'en-IN',
-            {
-              minimumFractionDigits: 2,
-            },
-          );
+          const formattedPrice = Number(
+            item.price || 0,
+          ).toLocaleString('en-IN', {
+            minimumFractionDigits: 2,
+          });
 
           return (
             <View style={styles.card}>
               <Pressable
                 onPress={() =>
-                  navigation.navigate('ProductDetails', {product: item})
+                  navigation.navigate(
+                    'ProductDetails',
+                    {product: item},
+                  )
                 }
                 style={styles.imageWrapper}>
-                <Image source={{uri: item.image}} style={styles.image} />
+
+                <Image
+                  source={{uri: item.image}}
+                  style={styles.image}
+                />
+
                 <Pressable
+                  disabled={actionLoading}
                   style={({pressed}) => [
                     styles.removeHeartBtn,
                     pressed && styles.pressed,
                   ]}
                   hitSlop={8}
-                  onPress={() => toggleWishlist(item)}>
-                  <Ionicons name="heart" size={20} color="#ff3b30" />
+                  onPress={() =>
+                    removeFromWishlist(item)
+                  }>
+
+                  <Ionicons
+                    name="heart"
+                    size={20}
+                    color="#ff3b30"
+                  />
                 </Pressable>
               </Pressable>
 
               <View style={styles.info}>
                 <Pressable
                   onPress={() =>
-                    navigation.navigate('ProductDetails', {product: item})
+                    navigation.navigate(
+                      'ProductDetails',
+                      {product: item},
+                    )
                   }>
-                  <Text style={styles.name} numberOfLines={2}>
+
+                  <Text
+                    style={styles.name}
+                    numberOfLines={2}>
                     {item.name}
                   </Text>
                 </Pressable>
 
-                <Text style={styles.price}>Rs. {formattedPrice}</Text>
+                <Text style={styles.price}>
+                  Rs. {formattedPrice}
+                </Text>
 
                 <View style={styles.actionRow}>
                   <Pressable
+                    disabled={actionLoading}
                     style={({pressed}) => [
                       styles.cartButton,
                       pressed && styles.pressed,
+                      actionLoading && styles.disabled,
                     ]}
-                    onPress={() => handleAddToCart(item)}>
+                    onPress={() =>
+                      handleAddToCart(item)
+                    }>
+
                     <Ionicons
                       name="cart-outline"
                       size={18}
                       color="#ffffff"
                       style={styles.buttonIcon}
                     />
-                    <Text style={styles.cartButtonText}>Add to Cart</Text>
+
+                    <Text style={styles.cartButtonText}>
+                      Add to Cart
+                    </Text>
                   </Pressable>
 
                   <Pressable
+                    disabled={actionLoading}
                     style={({pressed}) => [
                       styles.removeButton,
                       pressed && styles.pressed,
                     ]}
                     hitSlop={8}
-                    onPress={() => toggleWishlist(item)}>
-                    <Ionicons name="trash-outline" size={18} color="#71717a" />
+                    onPress={() =>
+                      removeFromWishlist(item)
+                    }>
+
+                    <Ionicons
+                      name="trash-outline"
+                      size={18}
+                      color="#71717a"
+                    />
                   </Pressable>
                 </View>
               </View>
@@ -214,9 +508,22 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8f9fa',
     paddingHorizontal: 16,
   },
+
+  loadingContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  loadingText: {
+    marginTop: 12,
+    fontSize: 15,
+    color: '#71717a',
+  },
+
   listContent: {
     paddingTop: 12,
   },
+
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -224,18 +531,21 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     paddingVertical: 4,
   },
+
   title: {
     fontSize: 26,
     fontWeight: '800',
     color: '#18181b',
     letterSpacing: -0.5,
   },
+
   subtitle: {
     fontSize: 13,
     color: '#71717a',
     marginTop: 2,
     fontWeight: '500',
   },
+
   addAllButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -246,14 +556,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#fed7aa',
   },
+
   addAllIcon: {
     marginRight: 6,
   },
+
   addAllText: {
     color: '#ff6b00',
     fontSize: 13,
     fontWeight: '700',
   },
+
   card: {
     backgroundColor: '#ffffff',
     borderRadius: 14,
@@ -267,15 +580,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#f0f0f0',
   },
+
   imageWrapper: {
     position: 'relative',
     backgroundColor: '#f4f4f5',
   },
+
   image: {
     width: '100%',
     height: 180,
     resizeMode: 'cover',
   },
+
   removeHeartBtn: {
     position: 'absolute',
     top: 10,
@@ -288,9 +604,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     elevation: 3,
   },
+
   info: {
     padding: 14,
   },
+
   name: {
     fontSize: 16,
     fontWeight: '600',
@@ -298,16 +616,19 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     lineHeight: 22,
   },
+
   price: {
     fontSize: 18,
     fontWeight: '800',
     marginBottom: 14,
     color: '#ff6b00',
   },
+
   actionRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
+
   cartButton: {
     flex: 1,
     height: 44,
@@ -323,11 +644,13 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
   },
+
   cartButtonText: {
     color: '#ffffff',
     fontSize: 15,
     fontWeight: '700',
   },
+
   removeButton: {
     width: 44,
     height: 44,
@@ -338,21 +661,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#f8f9fa',
   },
+
   buttonIcon: {
     marginRight: 6,
   },
+
   pressed: {
     opacity: 0.75,
   },
+
+  disabled: {
+    opacity: 0.5,
+  },
+
   emptyList: {
     flexGrow: 1,
   },
+
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 28,
   },
+
   emptyIconCircle: {
     width: 120,
     height: 120,
@@ -362,12 +694,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 20,
   },
+
   emptyTitle: {
     fontSize: 22,
     fontWeight: '800',
     color: '#18181b',
     marginBottom: 8,
   },
+
   emptyText: {
     fontSize: 14,
     color: '#71717a',
@@ -375,6 +709,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginBottom: 24,
   },
+
   shopButton: {
     backgroundColor: '#ff6b00',
     flexDirection: 'row',
@@ -384,6 +719,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     elevation: 3,
   },
+
   shopButtonText: {
     color: '#ffffff',
     fontSize: 15,
